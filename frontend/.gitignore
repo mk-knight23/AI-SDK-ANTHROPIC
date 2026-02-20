@@ -1,0 +1,10 @@
+node_modules
+/.cache
+/build
+.env
+.env.local
+.env.*.local
+/public/build
+/vite.config.ts.timestamp-*
+*.log
+.DS_Store
