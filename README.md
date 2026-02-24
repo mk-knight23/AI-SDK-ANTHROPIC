@@ -84,4 +84,71 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TB
+    subgraph "Frontend"
+        UI[User Interface]
+    end
+    
+    subgraph "Backend"
+        API[API Layer]
+        Core[AI Framework]
+        Providers[LLM Providers]
+    end
+    
+    subgraph "Infrastructure"
+        DB[(Database)]
+        Cache[(Cache)]
+    end
+    
+    UI -->|HTTP/WS| API
+    API --> Core
+    Core --> Providers
+    API --> DB
+    Core --> Cache
+```
+
+---
+
+## 📡 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /health | Health check |
+| POST | /api/execute | Execute agent workflow |
+| WS | /api/stream | WebSocket streaming |
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Connection refused**
+- Ensure backend is running
+- Check port availability
+
+**Authentication failures**
+- Verify API keys in `.env`
+- Check environment variables
+
+**Rate limiting**
+- Implement exponential backoff
+- Reduce request frequency
+
+---
+
+## 📚 Additional Documentation
+
+- [API Reference](docs/API.md) - Complete API documentation
+- [Deployment Guide](docs/DEPLOYMENT.md) - Platform-specific deployment
+- [Testing Guide](docs/TESTING.md) - Testing strategies and coverage
+---
+
+
 **Part of the [AI-SDK Ecosystem](https://github.com/mk-knight23/AI-SDK-ECOSYSTEM)**
