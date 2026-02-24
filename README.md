@@ -1,15 +1,15 @@
-# 🟣 Anthropic Claude SDK
+🟣 Anthropic Claude SDK
 
 [![Status](https://img.shields.io/badge/Status-Beta-yellow.svg)]()
 [![Version](https://img.shields.io/badge/Version-0.1.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)]()
 [![Coverage](https://img.shields.io/badge/Coverage-80%25-brightgreen.svg)]()
-[![Platform](https://img.shields.io/badge/Platform-Fly.io-informational.svg)](https://fly.io/)
+[![Platform](https://img.shields.io/badge/Platform-fly-io-informational.svg)](https://fly.io/)
 
 ## 📋 Overview
 
-Anthropic Claude integration with Remix and FastAPI
+Anthropic Claude SDK integration with Next.js and FastAPI
 
 **Current Version:** 0.1.0 | **Status:** Beta | **Completion:** 75%
 
@@ -19,7 +19,7 @@ Anthropic Claude integration with Remix and FastAPI
 
 ### What is Anthropic Claude SDK?
 
-Comprehensive Anthropic Claude API integration featuring Claude 3.5 Sonnet, Opus, and Haiku models. Includes artifact generation, vision capabilities, and advanced context management.
+A production-ready AI SDK application showcasing Anthropic's powerful capabilities for building integrating Claude models. This project demonstrates enterprise-grade patterns for AI-native application development.
 
 ### Why This Project Exists?
 
@@ -37,20 +37,23 @@ Building AI applications requires integrating multiple complex systems:
 - Context persistence and memory management
 - Vector database operations for RAG
 - Real-time streaming responses
-- Multi-agent orchestration
+- prompt engineering and Claude features
 
 This project provides a complete, working solution to these challenges.
 
 ### Key Features
 
 ✨ **Anthropic Integration**
-- Full-featured Anthropic v0.83.0 integration
-- Production-ready error handling and retries
-- Streaming and non-streaming response modes
-- Advanced prompt engineering templates
+- Full-featured Anthropic SDK
+- Claude 3.5 Sonnet & Opus support
+- Extended context windows (200K tokens)
+- Prompt engineering best practices
+- Streaming responses
+- Vision capabilities
+- MCP (Model Context Protocol) support
 
 🎨 **Modern UI**
-- Remix v2.0.0 with TypeScript
+- Modern React-based frontend with TypeScript
 - Responsive design with dark mode
 - Real-time updates via WebSocket
 - Accessible components (WCAG 2.1 AA)
@@ -88,25 +91,25 @@ This project provides a complete, working solution to these challenges.
 
 | Technology | Version | Description |
 |------------|---------|-------------|
-| [![Remix](https://remix.run/)](https://img.shields.io/badge/Remix-2.0.0-61DAFB.svg)] | 2.0.0 | Remix frontend framework |
-| [![React](https://react.dev/)](https://img.shields.io/badge/React-19.0-61DAFB.svg) | 19.0 | React library for UI |
-| [![TypeScript](https://www.typescriptlang.org/)](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg) | 5.0 | Type-safe JavaScript |
+| [![Next.js](https://nextjs.org/)](https://img.shields.io/badge/Next.js-15.1.0-61DAFB.svg) | 15 | Next.js frontend framework |
+| [![React](https://react.dev/)](https://img.shields.io/badge/React-19.0-61DAFB.svg) | 19 | React frontend framework |
+| [![TypeScript](https://www.typescriptlang.org/)](https://img.shields.io/badge/TypeScript-5-3178C6.svg) | 5 | Type-safe JavaScript |
 
 ### Backend
 
 | Technology | Version | Description |
 |------------|---------|-------------|
-| [![FastAPI](https://fastapi.tiangolo.com/)](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg)] | 0.115.0 | FastAPI backend framework |
-| [![Anthropic](https://github.com/anthropics/anthropic-sdk-python)](https://img.shields.io/badge/Anthropic-0.83.0-red.svg) | 0.83.0 | Anthropic AI SDK |
-| [![Python](https://www.python.org/)](https://img.shields.io/badge/Python-3.12%2B-3776AB.svg) | 3.12+ | Python runtime (if applicable) |
+| [![FastAPI](https://fastapi.tiangolo.com/)](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg) | 0.115.0 | FastAPI backend/framework |
+| [![Anthropic](https://github.com/anthropics/anthropic-sdk-python)](https://img.shields.io/badge/Anthropic-Latest-red.svg) | SDK | Anthropic backend/framework |
+| [![Python](https://www.python.org/)](https://img.shields.io/badge/Python-3.12%2B-3776AB.svg) | 3.12+ | Python backend/framework |
 
 ### Deployment
 
 | Platform | Purpose |
 |----------|---------|
-| [![Fly.io](https://fly.io/)](https://img.shields.io/badge/Deploy-Fly.io-informational.svg) | Primary deployment platform |
-| Docker | Containerization |
-| GitHub Actions | CI/CD pipeline |
+| [![Fly.io](https://img.shields.io/badge/Deploy-Fly.io-informational.svg)](https://fly.io/) | Primary deployment platform |
+| [![Docker](https://img.shields.io/badge/Docker-Containerization-2496ED.svg)](https://docker.com/) | docker |
+| [![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)](https://github.com/features/actions) | github actions |
 
 ---
 
@@ -119,8 +122,8 @@ This project provides a complete, working solution to these challenges.
 #### ✅ Completed Features
 
 - Core Anthropic integration
-- Remix frontend with TypeScript
-- FastAPI backend API
+- Modern frontend with TypeScript
+- Backend API framework
 - PostgreSQL database setup
 - Redis caching layer
 - Authentication system
@@ -275,44 +278,30 @@ docker-compose down
 ## 📁 Project Structure
 
 ```
-
 AI-SDK-ANTHROPIC/
   CLAUDE.md
   CONTRIBUTING.md
-  DEPLOYMENT.md
   LICENSE
   README.md
-  docker-compose.yml
-  fly.backend.toml
-  fly.frontend.toml
   frontend/
-    Dockerfile
-    package.json
-    postcss.config.js
-    tailwind.config.ts
-    tsconfig.json
-    vite.config.ts
-    app/
-      root.tsx
-      tailwind.css
+    src/
       components/
-        artifacts/
-        chat/
       lib/
-      routes/
-        _index.tsx
-    public/
-      favicon.ico
+      app/
   backend/
-    Dockerfile
-...
+    app/
+      api/
+      models/
+      services/
+    tests/
+  docs/
 ```
 
 ### Key Files and Directories
 
 | Path | Purpose |
 |------|---------|
-| `frontend/app/` | Frontend application code (Remix) |
+| `frontend/src/` | Frontend application code |
 | `frontend/components/` | Reusable UI components |
 | `frontend/lib/` | Utility functions and helpers |
 | `backend/app/` | Backend application code |
@@ -333,12 +322,12 @@ AI-SDK-ANTHROPIC/
 graph TB
     subgraph "Client Layer"
         A[User Browser]
-        B[Remix Frontend]
+        B[Frontend]
     end
 
     subgraph "API Layer"
         C[API Gateway]
-        D[FastAPI Backend]
+        D[Backend API]
         E[Authentication]
     end
 
@@ -374,8 +363,8 @@ graph TB
 
 **Architecture Overview:**
 
-1. **Client Layer**: Remix provides responsive UI with real-time updates
-2. **API Layer**: FastAPI handles business logic and request routing
+1. **Client Layer**: Modern frontend provides responsive UI with real-time updates
+2. **API Layer**: Backend framework handles business logic and request routing
 3. **AI Layer**: Anthropic orchestrates AI model interactions and workflows
 4. **Data Layer**: Persistent storage with caching for optimal performance
 
@@ -524,7 +513,7 @@ v1.0.0    # Major release (breaking changes)
 
 Release names follow the pattern: **[SDK Name] [Version]**
 
-Example: "LangChain 0.3.0", "CrewAI 0.28.0"
+Example: "Anthropic Latest"
 
 ### Versioning Strategy
 
@@ -652,6 +641,7 @@ ENABLE_ANALYTICS=false
 | File | Location | Purpose |
 |------|----------|---------|
 | `next.config.js` | `frontend/` | Next.js configuration |
+| `vite.config.ts` | `frontend/` | Vite configuration |
 | `tsconfig.json` | `frontend/` | TypeScript configuration |
 | `tailwind.config.js` | `frontend/` | Tailwind CSS configuration |
 | `pytest.ini` | `backend/` | Pytest configuration |
@@ -1006,8 +996,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full list of contributors.
 ### Acknowledgments
 
 - **Anthropic Team** - For the amazing AI SDK
-- **Remix Team** - For the excellent frontend framework
-- **FastAPI Team** - For the robust backend framework
+- **React Team** - For the excellent frontend framework
+- **FastAPI/Django/Flask Team** - For the robust backend framework
 - **Open Source Community** - For inspiration and feedback
 
 ### Related Projects
