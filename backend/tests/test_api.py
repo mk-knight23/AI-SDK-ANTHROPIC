@@ -1,514 +1,337 @@
-"""
-Tests for the FastAPI endpoints.
-Tests all API endpoints including /synthesize and /query.
-"""
+"""Tests for API endpoints."""
 
 import pytest
-import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from main import app, knowledge_index, document_ingestor
+from unittest.mock import AsyncMock, MagicMock, patch
+from fastapi.testclient import TestClient
+
+from main import app
+from app.models.chat import ChatMessage, MessageRole, Usage
 
 
-@pytest_asyncio.fixture
-async def async_client():
-    """Create an async test client."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+@pytest.mark.api
+class TestHealthEndpoints:
+    """Tests for health check endpoints."""
 
-
-@pytest_asyncio.fixture(autouse=True)
-async def clear_index():
-    """Clear the knowledge index before each test."""
-    knowledge_index.clear()
-    yield
-    knowledge_index.clear()
-
-
-@pytest_asyncio.fixture
-async def sample_documents(async_client):
-    """Fixture to create sample documents for testing."""
-    docs = [
-        {
-            "content": "Machine learning is a subset of artificial intelligence",
-            "title": "ML Overview",
-            "source": "arxiv",
-            "metadata": {"author": "Researcher A"}
-        },
-        {
-            "content": "Deep learning uses neural networks with multiple layers",
-            "title": "Deep Learning Basics",
-            "source": "arxiv",
-            "metadata": {"author": "Researcher B"}
-        },
-        {
-            "content": "Natural language processing enables machines to understand text",
-            "title": "NLP Fundamentals",
-            "source": "arxiv",
-            "metadata": {"author": "Researcher C"}
-        }
-    ]
-
-    for doc in docs:
-        await async_client.post("/ingest", json=doc)
-
-    return docs
-
-
-class TestRootEndpoint:
-    """Tests for the root endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_root_endpoint(self, async_client):
-        """Test the root endpoint returns correct structure."""
-        response = await async_client.get("/")
-
+    def test_root_endpoint(self, test_client):
+        """Test root endpoint returns API info."""
+        response = test_client.get("/")
         assert response.status_code == 200
         data = response.json()
-        assert "message" in data
-        assert "Welcome to ResearchSynthesis API" in data["message"]
-        assert "docs" in data
-        assert "health" in data
+        assert "name" in data
         assert "endpoints" in data
 
-    @pytest.mark.asyncio
-    async def test_root_endpoints_listed(self, async_client):
-        """Test that root endpoint lists available endpoints."""
-        response = await async_client.get("/")
-        data = response.json()
-
-        endpoints = data["endpoints"]
-        assert "ingest" in endpoints
-        assert "query" in endpoints
-        assert "synthesize" in endpoints
-        assert "documents" in endpoints
-
-
-class TestHealthEndpoint:
-    """Tests for the health check endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_health_endpoint(self, async_client):
-        """Test the health check endpoint."""
-        response = await async_client.get("/health")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "healthy"
-        assert "timestamp" in data
-        assert data["version"] == "0.1.0"
-        assert data["service"] == "research-synthesis-api"
-
-    @pytest.mark.asyncio
-    async def test_health_response_structure(self, async_client):
-        """Test that health response has all required fields."""
-        response = await async_client.get("/health")
-        data = response.json()
-
-        required_fields = ["status", "timestamp", "version", "service"]
-        for field in required_fields:
-            assert field in data, f"Missing required field: {field}"
-
-    @pytest.mark.asyncio
-    async def test_health_timestamp_iso_format(self, async_client):
-        """Test that timestamp is in ISO format."""
-        response = await async_client.get("/health")
-        data = response.json()
-
-        # Should be able to parse the timestamp
-        from datetime import datetime
-        timestamp = data["timestamp"]
-        try:
-            datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        except ValueError:
-            pytest.fail(f"Timestamp is not in valid ISO format: {timestamp}")
-
-
-class TestIngestEndpoint:
-    """Tests for the document ingestion endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_ingest_single_document(self, async_client):
-        """Test ingesting a single document."""
-        payload = {
-            "content": "Test document content",
-            "title": "Test Document",
-            "source": "test",
-            "metadata": {"key": "value"}
-        }
-
-        response = await async_client.post("/ingest", json=payload)
-
-        assert response.status_code == 201
-        data = response.json()
-        assert "id" in data
-        assert data["title"] == "Test Document"
-        assert data["source"] == "test"
-        assert "created_at" in data
-        assert "message" in data
-
-    @pytest.mark.asyncio
-    async def test_ingest_without_metadata(self, async_client):
-        """Test ingesting a document without optional metadata."""
-        payload = {
-            "content": "Simple content",
-            "title": "Simple Title"
-        }
-
-        response = await async_client.post("/ingest", json=payload)
-
-        assert response.status_code == 201
-        data = response.json()
-        assert data["title"] == "Simple Title"
-
-    @pytest.mark.asyncio
-    async def test_ingest_empty_content(self, async_client):
-        """Test that empty content is rejected."""
-        payload = {
-            "content": "",
-            "title": "Test"
-        }
-
-        response = await async_client.post("/ingest", json=payload)
-
-        assert response.status_code == 422  # Pydantic validation error
-
-    @pytest.mark.asyncio
-    async def test_ingest_whitespace_content(self, async_client):
-        """Test that whitespace-only content is rejected."""
-        payload = {
-            "content": "   ",
-            "title": "Test"
-        }
-
-        response = await async_client.post("/ingest", json=payload)
-
-        assert response.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_ingest_empty_title(self, async_client):
-        """Test that empty title is rejected."""
-        payload = {
-            "content": "Content",
-            "title": ""
-        }
-
-        response = await async_client.post("/ingest", json=payload)
-
-        assert response.status_code == 422  # Pydantic validation error
-
-    @pytest.mark.asyncio
-    async def test_ingest_document_added_to_index(self, async_client):
-        """Test that ingested document is queryable."""
-        payload = {
-            "content": "Unique content for testing",
-            "title": "Unique Title"
-        }
-
-        await async_client.post("/ingest", json=payload)
-
-        # Query for the content
-        query_response = await async_client.post("/query", json={"query": "unique content"})
-        assert query_response.status_code == 200
-        data = query_response.json()
-        assert data["total_results"] >= 1
-
-
-class TestBatchIngestEndpoint:
-    """Tests for the batch ingestion endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_ingest_batch(self, async_client):
-        """Test ingesting multiple documents at once."""
-        payload = {
-            "documents": [
-                {"content": "Doc 1", "title": "Title 1", "source": "src1"},
-                {"content": "Doc 2", "title": "Title 2", "source": "src2"},
-                {"content": "Doc 3", "title": "Title 3", "source": "src3"}
-            ]
-        }
-
-        response = await async_client.post("/ingest/batch", json=payload)
-
-        assert response.status_code == 201
-        data = response.json()
-        assert data["ingested_count"] == 3
-        assert len(data["documents"]) == 3
-
-    @pytest.mark.asyncio
-    async def test_ingest_batch_empty(self, async_client):
-        """Test that empty batch is rejected."""
-        payload = {"documents": []}
-
-        response = await async_client.post("/ingest/batch", json=payload)
-
-        assert response.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_ingest_batch_partial_invalid(self, async_client):
-        """Test that batch with invalid document is rejected."""
-        payload = {
-            "documents": [
-                {"content": "Valid", "title": "Valid"},
-                {"content": "", "title": "Invalid"}  # Empty content
-            ]
-        }
-
-        response = await async_client.post("/ingest/batch", json=payload)
-
-        assert response.status_code == 422  # Pydantic validation error
-
-
-class TestQueryEndpoint:
-    """Tests for the query endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_query_with_results(self, async_client, sample_documents):
-        """Test querying returns relevant documents."""
-        payload = {"query": "machine learning", "top_k": 5}
-
-        response = await async_client.post("/query", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["query"] == "machine learning"
-        assert data["total_results"] > 0
-        assert len(data["results"]) > 0
-
-    @pytest.mark.asyncio
-    async def test_query_no_results(self, async_client, sample_documents):
-        """Test querying with no matches."""
-        payload = {"query": "quantum physics", "top_k": 5}
-
-        response = await async_client.post("/query", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total_results"] == 0
-        assert data["results"] == []
-
-    @pytest.mark.asyncio
-    async def test_query_respects_top_k(self, async_client, sample_documents):
-        """Test that top_k parameter limits results."""
-        payload = {"query": "research", "top_k": 2}
-
-        response = await async_client.post("/query", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data["results"]) <= 2
-
-    @pytest.mark.asyncio
-    async def test_query_empty_index(self, async_client):
-        """Test querying with no documents."""
-        payload = {"query": "anything"}
-
-        response = await async_client.post("/query", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total_results"] == 0
-
-    @pytest.mark.asyncio
-    async def test_query_invalid_top_k(self, async_client):
-        """Test that invalid top_k values are rejected."""
-        payload = {"query": "test", "top_k": 0}
-
-        response = await async_client.post("/query", json=payload)
-
-        assert response.status_code == 422  # Validation error
-
-    @pytest.mark.asyncio
-    async def test_query_top_k_too_high(self, async_client):
-        """Test that top_k above max is rejected."""
-        payload = {"query": "test", "top_k": 25}
-
-        response = await async_client.post("/query", json=payload)
-
-        assert response.status_code == 422
-
-    @pytest.mark.asyncio
-    async def test_query_result_structure(self, async_client, sample_documents):
-        """Test that query results have correct structure."""
-        payload = {"query": "machine learning"}
-
-        response = await async_client.post("/query", json=payload)
-        data = response.json()
-
-        if data["results"]:
-            result = data["results"][0]
-            required_fields = ["id", "title", "source", "content_preview", "metadata", "created_at"]
-            for field in required_fields:
-                assert field in result, f"Missing field: {field}"
-
-
-class TestSynthesizeEndpoint:
-    """Tests for the synthesize endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_synthesize_with_results(self, async_client, sample_documents):
-        """Test synthesis returns synthesized response."""
-        payload = {"query": "artificial intelligence"}
-
-        response = await async_client.post("/synthesize", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["query"] == "artificial intelligence"
-        assert "response" in data
-        assert len(data["response"]) > 0
-        assert "sources" in data
-        assert "confidence" in data
-        assert "metadata" in data
-
-    @pytest.mark.asyncio
-    async def test_synthesize_no_results(self, async_client, sample_documents):
-        """Test synthesis with no matching documents."""
-        payload = {"query": "quantum computing"}
-
-        response = await async_client.post("/synthesize", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["query"] == "quantum computing"
-        assert data["sources"] == []
-        assert data["confidence"] == 0.0
-
-    @pytest.mark.asyncio
-    async def test_synthesize_source_structure(self, async_client, sample_documents):
-        """Test that synthesis sources have correct structure."""
-        payload = {"query": "machine learning"}
-
-        response = await async_client.post("/synthesize", json=payload)
-        data = response.json()
-
-        for source in data["sources"]:
-            assert "id" in source
-            assert "title" in source
-            assert "source" in source
-
-    @pytest.mark.asyncio
-    async def test_synthesize_confidence_range(self, async_client, sample_documents):
-        """Test that confidence is within valid range."""
-        payload = {"query": "research"}
-
-        response = await async_client.post("/synthesize", json=payload)
-        data = response.json()
-
-        assert 0 <= data["confidence"] <= 1
-
-    @pytest.mark.asyncio
-    async def test_synthesize_empty_query(self, async_client):
-        """Test that empty query is rejected."""
-        payload = {"query": ""}
-
-        response = await async_client.post("/synthesize", json=payload)
-
-        assert response.status_code == 422
-
-
-class TestDocumentsListEndpoint:
-    """Tests for the documents list endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_list_documents_empty(self, async_client):
-        """Test listing documents when empty."""
-        response = await async_client.get("/documents")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data == []
-
-    @pytest.mark.asyncio
-    async def test_list_documents_with_data(self, async_client, sample_documents):
-        """Test listing documents with data."""
-        response = await async_client.get("/documents")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 3
-
-    @pytest.mark.asyncio
-    async def test_list_documents_structure(self, async_client, sample_documents):
-        """Test that listed documents have correct structure."""
-        response = await async_client.get("/documents")
-        data = response.json()
-
-        for doc in data:
-            required_fields = ["id", "title", "source", "content_preview", "metadata", "created_at"]
-            for field in required_fields:
-                assert field in doc, f"Missing field: {field}"
-
-
-class TestDocumentGetEndpoint:
-    """Tests for getting a specific document."""
-
-    @pytest.mark.asyncio
-    async def test_get_document_exists(self, async_client, sample_documents):
-        """Test getting an existing document."""
-        # First list to get an ID
-        list_response = await async_client.get("/documents")
-        docs = list_response.json()
-        doc_id = docs[0]["id"]
-
-        response = await async_client.get(f"/documents/{doc_id}")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == doc_id
-
-    @pytest.mark.asyncio
-    async def test_get_document_not_exists(self, async_client):
-        """Test getting a non-existent document."""
-        response = await async_client.get("/documents/nonexistent-id")
-
-        assert response.status_code == 404
-
-
-class TestDocumentDeleteEndpoint:
-    """Tests for deleting a document."""
-
-    @pytest.mark.asyncio
-    async def test_delete_document_exists(self, async_client, sample_documents):
-        """Test deleting an existing document."""
-        # First list to get an ID
-        list_response = await async_client.get("/documents")
-        docs = list_response.json()
-        doc_id = docs[0]["id"]
-
-        response = await async_client.delete(f"/documents/{doc_id}")
-
-        assert response.status_code == 204
-
-        # Verify it's gone
-        get_response = await async_client.get(f"/documents/{doc_id}")
-        assert get_response.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_delete_document_not_exists(self, async_client):
-        """Test deleting a non-existent document."""
-        response = await async_client.delete("/documents/nonexistent-id")
-
-        assert response.status_code == 404
-
-
-class TestErrorHandling:
-    """Tests for error handling."""
-
-    @pytest.mark.asyncio
-    async def test_404_handler(self, async_client):
-        """Test 404 for non-existent endpoint."""
-        response = await async_client.get("/nonexistent")
-
-        assert response.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_invalid_json(self, async_client):
-        """Test handling of invalid JSON."""
-        response = await async_client.post(
-            "/ingest",
-            content="not valid json",
-            headers={"content-type": "application/json"}
-        )
-
-        assert response.status_code == 422
+    def test_health_endpoint(self, test_client):
+        """Test health check endpoint."""
+        with patch("main.llm_router") as mock_router:
+            mock_router.health_check = AsyncMock(return_value={"anthropic": True})
+
+            response = test_client.get("/health")
+            assert response.status_code == 200
+            data = response.json()
+            assert "status" in data
+            assert "timestamp" in data
+
+
+@pytest.mark.api
+class TestProviderEndpoints:
+    """Tests for provider management endpoints."""
+
+    def test_get_providers(self, test_client):
+        """Test getting provider status."""
+        with patch("main.llm_router") as mock_router:
+            mock_router.get_provider_status = AsyncMock(return_value=[])
+
+            response = test_client.get("/api/providers")
+            assert response.status_code == 200
+            assert isinstance(response.json(), list)
+
+    def test_switch_provider(self, test_client):
+        """Test switching provider."""
+        with patch("main.llm_router") as mock_router:
+            mock_router.set_preferred_provider = MagicMock()
+
+            response = test_client.post(
+                "/api/providers/switch",
+                json={"provider": "openrouter", "force": False},
+            )
+            assert response.status_code == 200
+
+    def test_switch_provider_invalid(self, test_client):
+        """Test switching to invalid provider."""
+        with patch("main.llm_router") as mock_router:
+            mock_router.set_preferred_provider = MagicMock(
+                side_effect=ValueError("Unknown provider")
+            )
+
+            response = test_client.post(
+                "/api/providers/switch",
+                json={"provider": "invalid", "force": False},
+            )
+            assert response.status_code == 400
+
+    def test_providers_health_check(self, test_client):
+        """Test providers health check endpoint."""
+        with patch("main.llm_router") as mock_router:
+            mock_router.health_check = AsyncMock(
+                return_value={"anthropic": True, "openrouter": False}
+            )
+
+            response = test_client.post("/api/providers/health")
+            assert response.status_code == 200
+            data = response.json()
+            assert "providers" in data
+
+
+@pytest.mark.api
+class TestChatEndpoints:
+    """Tests for chat endpoints."""
+
+    def test_chat_completion(self, test_client, sample_chat_request):
+        """Test chat completion endpoint."""
+        with patch("main.llm_router") as mock_router:
+            from app.models.chat import ChatResponse
+
+            mock_response = ChatResponse(
+                id="msg_123",
+                role=MessageRole.ASSISTANT,
+                content="Hello! How can I help you?",
+                model="claude-sonnet-4-6",
+                usage=Usage(input_tokens=10, output_tokens=20, total_tokens=30),
+            )
+            mock_router.chat = AsyncMock(return_value=mock_response)
+
+            response = test_client.post(
+                "/api/chat",
+                json=sample_chat_request.model_dump(),
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["content"] == "Hello! How can I help you?"
+            assert data["id"] == "msg_123"
+
+    def test_chat_completion_with_thinking(self, test_client):
+        """Test chat completion with extended thinking."""
+        with patch("main.llm_router") as mock_router:
+            from app.models.chat import ChatResponse, ThinkingConfig
+
+            mock_response = ChatResponse(
+                id="msg_456",
+                role=MessageRole.ASSISTANT,
+                content="Here's the answer.",
+                model="claude-sonnet-4-6",
+                usage=Usage(input_tokens=50, output_tokens=100, total_tokens=150),
+                thinking="Let me think about this step by step...",
+            )
+            mock_router.chat = AsyncMock(return_value=mock_response)
+
+            request_data = {
+                "messages": [
+                    {"role": "user", "content": "Solve this complex problem"}
+                ],
+                "thinking": {"enabled": True, "max_tokens": 10000},
+            }
+
+            response = test_client.post("/api/chat", json=request_data)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["thinking"] is not None
+
+    def test_chat_stream(self, test_client):
+        """Test chat streaming endpoint."""
+        with patch("main.llm_router") as mock_router:
+            from app.models.chat import StreamingChunk
+
+            async def mock_stream():
+                yield StreamingChunk(
+                    id="msg_789",
+                    event_type="content_block_delta",
+                    content="Hello",
+                )
+                yield StreamingChunk(
+                    id="msg_789",
+                    event_type="content_block_delta",
+                    content=" world",
+                )
+
+            mock_router.chat_stream = mock_stream
+
+            request_data = {
+                "messages": [
+                    {"role": "user", "content": "Hello"}
+                ],
+                "stream": True,
+            }
+
+            response = test_client.post("/api/chat/stream", json=request_data)
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
+    def test_chat_completion_error(self, test_client):
+        """Test chat completion with error."""
+        with patch("main.llm_router") as mock_router:
+            mock_router.chat = AsyncMock(side_effect=Exception("API error"))
+
+            response = test_client.post(
+                "/api/chat",
+                json={"messages": [{"role": "user", "content": "Test"}]},
+            )
+            assert response.status_code == 500
+
+
+@pytest.mark.api
+class TestArtifactEndpoints:
+    """Tests for artifact endpoints."""
+
+    def test_create_artifact(self, test_client, sample_artifact_request):
+        """Test creating an artifact."""
+        with patch("main.artifact_service") as mock_service:
+            from app.models.artifact import ArtifactResponse, ArtifactStatus
+
+            mock_response = ArtifactResponse(
+                id="art_123",
+                artifact_type=sample_artifact_request.artifact_type,
+                status=ArtifactStatus.COMPLETED,
+                filename="test_20250223.pdf",
+                download_url="/api/artifacts/art_123/download",
+                file_size_bytes=1234,
+            )
+            mock_service.create_artifact = AsyncMock(return_value=mock_response)
+
+            response = test_client.post(
+                "/api/artifacts",
+                json=sample_artifact_request.model_dump(),
+            )
+            assert response.status_code == 201
+            data = response.json()
+            assert data["id"] == "art_123"
+            assert data["status"] == "completed"
+
+    def test_list_artifacts(self, test_client):
+        """Test listing artifacts."""
+        with patch("main.artifact_service") as mock_service:
+            mock_service.list_artifacts = AsyncMock(return_value=[])
+
+            response = test_client.get("/api/artifacts")
+            assert response.status_code == 200
+            assert isinstance(response.json(), list)
+
+    def test_list_artifacts_by_type(self, test_client):
+        """Test listing artifacts filtered by type."""
+        with patch("main.artifact_service") as mock_service:
+            from app.models.artifact import ArtifactType
+
+            mock_service.list_artifacts = AsyncMock(return_value=[])
+
+            response = test_client.get("/api/artifacts?artifact_type=pdf")
+            assert response.status_code == 200
+
+    def test_get_artifact(self, test_client):
+        """Test getting artifact details."""
+        with patch("main.artifact_service") as mock_service:
+            from app.models.artifact import ArtifactResponse, ArtifactStatus, ArtifactType
+
+            mock_response = ArtifactResponse(
+                id="art_123",
+                artifact_type=ArtifactType.PDF,
+                status=ArtifactStatus.COMPLETED,
+                filename="test.pdf",
+                download_url="/download",
+            )
+            mock_service.get_artifact = AsyncMock(return_value=mock_response)
+
+            response = test_client.get("/api/artifacts/art_123")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["id"] == "art_123"
+
+    def test_get_artifact_not_found(self, test_client):
+        """Test getting non-existent artifact."""
+        with patch("main.artifact_service") as mock_service:
+            mock_service.get_artifact = AsyncMock(return_value=None)
+
+            response = test_client.get("/api/artifacts/nonexistent")
+            assert response.status_code == 404
+
+    def test_download_artifact(self, test_client):
+        """Test downloading an artifact."""
+        with patch("main.artifact_service") as mock_service:
+            mock_service.get_artifact_content = AsyncMock(return_value=b"test content")
+            mock_service.get_artifact = AsyncMock(
+                return_value=MagicMock(filename="test.txt")
+            )
+
+            response = test_client.get("/api/artifacts/art_123/download")
+            assert response.status_code == 200
+            assert response.content == b"test content"
+
+    def test_delete_artifact(self, test_client):
+        """Test deleting an artifact."""
+        with patch("main.artifact_service") as mock_service:
+            mock_service.delete_artifact = AsyncMock(return_value=True)
+
+            response = test_client.delete("/api/artifacts/art_123")
+            assert response.status_code == 204
+
+    def test_delete_artifact_not_found(self, test_client):
+        """Test deleting non-existent artifact."""
+        with patch("main.artifact_service") as mock_service:
+            mock_service.delete_artifact = AsyncMock(return_value=False)
+
+            response = test_client.delete("/api/artifacts/nonexistent")
+            assert response.status_code == 404
+
+
+@pytest.mark.api
+class TestComputerUseEndpoints:
+    """Tests for computer use endpoints."""
+
+    def test_execute_computer_use(self, test_client, sample_computer_use_request):
+        """Test executing computer use actions."""
+        with patch("main.computer_use_service") as mock_service:
+            from app.models.computer_use import ActionResult
+
+            mock_response = MagicMock()
+            mock_response.session_id = "session_123"
+            mock_response.results = [ActionResult(success=True, output="Done", execution_time_ms=100)]
+            mock_response.screenshots = []
+            mock_response.total_execution_time_ms = 100
+            mock_response.actions_completed = 1
+            mock_response.actions_failed = 0
+            mock_response.metadata = {}
+            mock_response.timestamp = MagicMock()
+
+            mock_service.execute_actions = AsyncMock(return_value=mock_response)
+
+            response = test_client.post(
+                "/api/computer-use",
+                json=sample_computer_use_request.model_dump(),
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["session_id"] == "session_123"
+
+    def test_list_computer_sessions(self, test_client):
+        """Test listing computer use sessions."""
+        with patch("main.computer_use_service") as mock_service:
+            mock_service.list_sessions = AsyncMock(return_value=[])
+
+            response = test_client.get("/api/computer-use/sessions")
+            assert response.status_code == 200
+            data = response.json()
+            assert "sessions" in data
+
+    def test_close_computer_session(self, test_client):
+        """Test closing a computer use session."""
+        with patch("main.computer_use_service") as mock_service:
+            mock_service.close_session = AsyncMock(return_value=True)
+
+            response = test_client.delete("/api/computer-use/sessions/session_123")
+            assert response.status_code == 200
+
+    def test_close_nonexistent_session(self, test_client):
+        """Test closing non-existent session."""
+        with patch("main.computer_use_service") as mock_service:
+            mock_service.close_session = AsyncMock(return_value=False)
+
+            response = test_client.delete("/api/computer-use/sessions/nonexistent")
+            assert response.status_code == 404
