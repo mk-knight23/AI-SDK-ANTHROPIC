@@ -1,0 +1,13 @@
+{
+  "name": "AI-SDK-ANTHROPIC",
+  "title": "Anthropic Trust Core",
+  "description": "Claude-centered secure agent runtime with policy-first design",
+  "topics": [
+    "anthropic",
+    "claude",
+    "security",
+    "mcp",
+    "python"
+  ],
+  "homepage": "https://mk-knight23.github.io/AI-SDK-ANTHROPIC"
+}
