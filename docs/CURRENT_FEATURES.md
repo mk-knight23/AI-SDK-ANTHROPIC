@@ -1,10 +1,12 @@
-# Project Brain: AI-SDK-ANTHROPIC
+# Current Feature Inventory
 
-## Purpose
+## Repository
 
-Claude-centered secure agent runtime with policy-first design.
+- Name: `AI-SDK-ANTHROPIC`
+- SDK: Anthropic Claude SDK
+- Positioning: Claude-centered secure agent runtime with policy-first design.
 
-## Current State
+## Implemented Today
 
 - Mission-to-agent routing through the shared Agents Army registry.
 - FastAPI service with `GET /health` and `POST /run`.
@@ -12,14 +14,14 @@ Claude-centered secure agent runtime with policy-first design.
 - Anthropic client initialization path with graceful dependency handling.
 - Dockerfile, GitHub Actions CI, pytest contract tests, and repository metadata.
 
-## Upgrade Direction
+## Not Yet Implemented
 
 - Connect routed missions to Claude Messages API calls.
 - Add safety policy templates and refusal/audit logging.
 - Add evaluation traces for cost, latency, and policy compliance.
 
-## Quality Bar
+## Verification Contract
 
-- Keep the repository runnable from a fresh clone.
-- Keep generated caches and local secrets out of git.
-- Keep README, skill matrix, tests, and CI aligned with actual behavior.
+- The local runner must complete without crashing when optional SDK credentials are missing.
+- The API contract must return routing and verification fields.
+- Tests must prove mission routing and a security-focused SENTINEL route.
